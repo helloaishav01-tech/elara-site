@@ -6,21 +6,21 @@ const STORIES = [
     n: "01",
     title: "The Slow Sunday",
     season: "Spring · Edition 03",
-    image: "https://images.unsplash.com/photo-1763906472357-f08f61969476?w=1400&q=80",
+    image: "https://images.unsplash.com/photo-1490750967868-88df5691cc4f?w=1400&q=80",
     text: "She rose to a sky the color of cream. The peonies were already bored of waiting. We followed her, in flat Aquazzura mules, to a market that smelled of yeast and lilies.",
   },
   {
     n: "02",
     title: "An Afternoon in Lavender",
     season: "Provence · April",
-    image: "https://images.unsplash.com/photo-1771620887053-09dfc403b1de?w=1400&q=80",
+    image: "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=1400&q=80",
     text: "Heels off, dusted with the gold of pollen. The Valentino slingbacks watched from the gravel. Some afternoons are made for bare feet; the shoes know it too.",
   },
   {
     n: "03",
     title: "Bridal · The First Walk",
     season: "Editorial · No. 07",
-    image: "https://images.unsplash.com/photo-1764423805989-ec426dfb8de8?w=1400&q=80",
+    image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1400&q=80",
     text: "She wore the Hangisi. Of course she wore the Hangisi. The aisle was scattered with hellebore petals. Her mother wept first; the photographer wept second.",
   },
 ];
@@ -66,7 +66,6 @@ export default function Editorial() {
         ))}
       </div>
 
-      {/* Closing quote */}
       <section className="mt-32 px-6 md:px-12 max-w-3xl mx-auto text-center relative z-10">
         <Reveal>
           <p className="font-serif italic text-palm text-3xl sm:text-4xl leading-tight">

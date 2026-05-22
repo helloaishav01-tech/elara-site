@@ -112,12 +112,6 @@ export default function Cart() {
             <Reveal>
               <div className="elara-glass p-8 rounded-md sticky top-32">
                 <p className="text-[0.65rem] tracking-[0.3em] uppercase text-gold mb-6">Order Summary</p>
-{coupon && (
-  <div className="flex justify-between text-pines">
-    <span>Discount ({coupon.code})</span>
-    <span>− € {coupon.discount_amount.toLocaleString()}</span>
-  </div>
-)}
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between text-palm">
                     <span>Subtotal ({cart.length} item{cart.length > 1 ? "s" : ""})</span>

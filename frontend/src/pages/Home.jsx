@@ -1,34 +1,58 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Sparkles } from "lucide-react";
-import StainedGlass from "../components/StainedGlass";
 import Petals from "../components/Petals";
 import BrandStrip from "../components/BrandStrip";
 import Reveal from "../components/Reveal";
 import { CATEGORIES } from "../data/products";
+import peonyhero from "../images/peony-hero.jpg";
+import floralBg from "../images/floral-bg.jpg";
+import floral2 from "../images/floral-2.jpg";
 
-const HERO_IMG = "https://images.unsplash.com/photo-1771620887053-09dfc403b1de?w=1200&q=80&auto=format&fit=crop";
-const ABOUT_IMG = "https://images.unsplash.com/photo-1764423805989-ec426dfb8de8?w=1200&q=80&auto=format&fit=crop";
+const FLORAL_BG = <img src={floral2} alt="Flowers" className="w-full h-full object-cover" />;
+const CATEGORY_IMGS = {
+  heels: "https://images.unsplash.com/photo-1515347619252-60a4bf4fff4f?w=600&q=80",
+  mules: "https://images.unsplash.com/photo-1603487742131-4160ec999306?w=600&q=80",
+  sandals: "https://images.unsplash.com/photo-1562273138-f46be4ebdf33?w=600&q=80",
+  flats: "https://images.unsplash.com/photo-1544441893-675973e31985?w=600&q=80",
+  boots: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&q=80",
+  evening: <img src={floralBg} alt="Botanical floral" className="w-full aspect-[4/5] object-cover rounded shadow-xl" />
+};
 
 export default function Home() {
   return (
     <main data-testid="page-home">
       {/* ===================== HERO ===================== */}
       <section className="relative min-h-screen pt-32 pb-24 overflow-hidden elara-wallpaper" data-testid="hero-section">
-        {/* Stained-glass parallax layer */}
-        <div className="absolute -right-20 top-10 w-[640px] h-[640px] opacity-70 pointer-events-none hidden md:block">
-          <StainedGlass />
+
+        {/* Peony fills entire right half with glow */}
+        <div className="absolute right-0 top-0 w-[55%] h-full pointer-events-none hidden md:block">
+          {/* Multiple glow layers */}
+          <div className="absolute inset-0"
+            style={{ background: "radial-gradient(ellipse at 60% 40%, rgba(230,177,196,0.7) 0%, rgba(239,212,221,0.4) 35%, transparent 65%)" }} />
+          <div className="absolute inset-0 blur-3xl opacity-50"
+            style={{ background: "radial-gradient(ellipse at 50% 50%, rgba(201,169,110,0.5) 0%, transparent 60%)" }} />
+          {/* Peony image covering right side */}
+          <img
+            src={peonyhero}
+            alt="Peony"
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{
+              maskImage: "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.3) 20%, black 50%, black 100%)",
+              WebkitMaskImage: "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.3) 20%, black 50%, black 100%)",
+              filter: "drop-shadow(0 0 60px rgba(230,177,196,0.9)) drop-shadow(0 0 120px rgba(201,169,110,0.5)) brightness(1.05) saturate(1.1)",
+            }}
+          />
+          {/* Glow overlay on top of image */}
+          <div className="absolute inset-0 pointer-events-none"
+            style={{ background: "radial-gradient(ellipse at 70% 30%, rgba(255,220,235,0.3) 0%, transparent 50%), radial-gradient(ellipse at 30% 70%, rgba(201,169,110,0.2) 0%, transparent 40%)" }} />
         </div>
-        {/* Soft floral wash */}
-        <div
-          className="absolute inset-0 opacity-60 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(circle at 12% 18%, rgba(239,212,221,0.55) 0, transparent 38%), radial-gradient(circle at 92% 82%, rgba(230,177,196,0.45) 0, transparent 42%), radial-gradient(circle at 50% 100%, rgba(156,159,105,0.18) 0, transparent 50%)",
-          }}
-        />
+
+        {/* Soft floral wash on left */}
+        <div className="absolute inset-0 opacity-50 pointer-events-none"
+          style={{ background: "radial-gradient(circle at 5% 20%, rgba(239,212,221,0.6) 0, transparent 35%)" }} />
         <Petals />
 
-        <div className="relative max-w-7xl mx-auto px-6 md:px-12 grid lg:grid-cols-12 gap-10 items-center">
+        <div className="relative max-w-7xl mx-auto px-6 md:px-12 grid lg:grid-cols-12 gap-10 items-center min-h-[80vh]">
           {/* Left: Text */}
           <div className="lg:col-span-6 z-10">
             <Reveal>
@@ -81,28 +105,9 @@ export default function Home() {
             </Reveal>
           </div>
 
-          {/* Right: Editorial visual + placeholder */}
-          <div className="lg:col-span-6 relative h-[520px] lg:h-[640px]">
-            {/* Real editorial image */}
-            <Reveal className="absolute top-0 right-0 w-3/4 h-3/5 z-10">
-              <img
-                src={HERO_IMG}
-                alt="Editorial fashion"
-                className="w-full h-full object-cover rounded-sm shadow-2xl"
-              />
-              <div className="absolute inset-0 ring-1 ring-gold/30 rounded-sm pointer-events-none" />
-            </Reveal>
-            {/* Placeholder for shoe image */}
-           <Reveal delay={200} className="absolute bottom-0 left-0 w-3/5 h-3/5 z-20 elara-glass p-3">
-              <div className="elara-placeholder !aspect-auto h-full">
-                <span>Image</span>
-              </div>
-              <p className="absolute -bottom-7 left-0 text-[0.6rem] tracking-[0.3em] uppercase text-palm/50">
-                01 · Hero Pair
-              </p>
-            </Reveal>
-            {/* Decorative tag */}
-            <Reveal delay={400} className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-4 hidden md:block z-30">
+          {/* Right: In Bloom tag */}
+          <div className="lg:col-span-6 relative hidden lg:flex items-end justify-start h-full pb-32">
+            <Reveal delay={400}>
               <div className="elara-glass px-5 py-3 rounded-full">
                 <p className="text-[0.6rem] tracking-[0.3em] uppercase text-palm flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-gold animate-shimmer" />
@@ -137,19 +142,18 @@ export default function Home() {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
           {CATEGORIES.map((c, i) => (
             <Reveal key={c.slug} delay={i * 80}>
-              <Link
-                to={`/collections?cat=${c.slug}`}
-                className="elara-card block group"
-                data-testid={`home-cat-${c.slug}`}
-              >
-                <div className="elara-placeholder">
-              a    <span>Image</span>
+              <Link to={`/collections?cat=${c.slug}`} className="elara-card block group" data-testid={`home-cat-${c.slug}`}>
+                <div className="relative overflow-hidden aspect-[3/4]">
+                  <img
+                    src={CATEGORY_IMGS[c.slug]}
+                    alt={c.name}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-palm/20 to-transparent" />
                 </div>
                 <div className="p-6 flex items-center justify-between">
                   <div>
-                    <p className="text-[0.6rem] tracking-[0.3em] uppercase text-willow mb-1">
-                      0{i + 1}
-                    </p>
+                    <p className="text-[0.6rem] tracking-[0.3em] uppercase text-willow mb-1">0{i + 1}</p>
                     <h3 className="font-serif text-2xl text-palm">{c.name}</h3>
                   </div>
                   <ArrowRight className="w-4 h-4 text-gold group-hover:translate-x-1 transition-transform" />
@@ -163,8 +167,8 @@ export default function Home() {
       {/* ===================== EDITORIAL TEASER ===================== */}
       <section className="relative py-32 overflow-hidden" data-testid="home-editorial-teaser">
         <div className="absolute inset-0 -z-10">
-          <img src={ABOUT_IMG} alt="Floral arrangement" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-cream/75" />
+          <img src={peonyhero} alt="Floral arrangement" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-cream/70" />
         </div>
         <div className="max-w-4xl mx-auto px-6 md:px-12 text-center">
           <Reveal>
