@@ -11,3 +11,4 @@ export const subscribeNewsletter = (email, name) =>
 export const fetchReviews = () => api.get("/reviews").then(r => r.data);
 export const fetchReviewSummary = () => api.get("/reviews/summary").then(r => r.data);
 export const submitReview = (payload) => api.post("/reviews", payload).then(r => r.data);
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
