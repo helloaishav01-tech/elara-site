@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone, timedelta
+import razorpay
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -27,7 +28,13 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-
+# Razorpay client
+razorpay_client = razorpay.Client(
+    auth=(
+        os.environ.get("RAZORPAY_KEY_ID", "rzp_test_StJwGj5ruwAviX"),
+        os.environ.get("RAZORPAY_KEY_SECRET", "")
+    )
+)
 # ─────────────────────────────────────────
 # EMAIL
 # ─────────────────────────────────────────

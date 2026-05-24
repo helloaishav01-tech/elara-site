@@ -1,10 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../lib/CartContext";
 import Reveal from "../components/Reveal";
 import { Check, AlertCircle } from "lucide-react";
 
 const STEPS = ["Shipping", "Payment", "Review"];
+
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
 
 const Field = ({ name, label, value, onChange, placeholder = "", maxLength, col2 = false, errors = {} }) => (
   <div className={col2 ? "col-span-2" : ""}>
@@ -26,6 +36,19 @@ const Field = ({ name, label, value, onChange, placeholder = "", maxLength, col2
 export default function Checkout() {
   const { cart, total, clearCart } = useCart();
   const navigate = useNavigate();
+
+export default function Checkout() {
+  const { cart, total, clearCart } = useCart();
+  const navigate = useNavigate();
+  
+  // ← ADD THIS
+  useEffect(() => {
+    loadRazorpayScript();
+  }, []);
+  // ← END
+  
+  const [step, setStep] = useState(0);
+  
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState({});
   const [paymentMethod, setPaymentMethod] = useState("card");
@@ -125,32 +148,67 @@ export default function Checkout() {
 
   // ✅ coupon use is INSIDE handleOrder — this was the bug!
   const handleOrder = async () => {
-    try {
-      if (coupon) {
-        await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/coupons/use`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code: coupon.code })
-        });
-      }
-      await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/orders`, {
+  try {
+    // Use coupon if applied
+    if (coupon) {
+      await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/coupons/use`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: cart,
-          total: grandTotal,
-          email: shipping.email,
-          shipping: shipping,
-          payment_method: paymentMethod,
-          status: "pending"
-        })
+        body: JSON.stringify({ code: coupon.code })
       });
-    } catch (e) {
-      console.log("Order save failed", e);
     }
-    clearCart();
-    navigate("/order-confirmation");
-  };
+
+    // Create order
+    const orderRes = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/orders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: cart,
+        total: grandTotal,
+        email: shipping.email,
+        shipping: shipping,
+        payment_method: paymentMethod,
+        status: "pending",
+        coupon_code: coupon?.code || null,
+        discount: discount
+      })
+    });
+    
+    const order = await orderRes.json();
+
+    // If UPI/Card - open Razorpay
+    if (paymentMethod === "card" || paymentMethod === "upi" || paymentMethod === "gpay") {
+      const options = {
+        key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+        amount: Math.round(grandTotal * 100), // paise
+        currency: "INR",
+        name: "ELARA Atelier",
+        description: `Order #${order.order_number}`,
+        handler: function (response) {
+          clearCart();
+          navigate(`/order-confirmation?order=${order.order_number}`);
+        },
+        prefill: {
+          name: `${shipping.firstName} ${shipping.lastName}`,
+          email: shipping.email,
+          contact: shipping.phone
+        },
+        theme: { color: "#c9a96e" }
+      };
+      
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+    } else {
+      // PayPal or other - skip payment for now
+      clearCart();
+      navigate(`/order-confirmation?order=${order.order_number}`);
+    }
+    
+  } catch (e) {
+    console.error("Order failed", e);
+    alert("Failed to place order. Please try again.");
+  }
+};
 
   if (cart.length === 0 && step === 0) {
     navigate("/cart");
@@ -459,4 +517,4 @@ export default function Checkout() {
       </div>
     </main>
   );
-}
+} }
