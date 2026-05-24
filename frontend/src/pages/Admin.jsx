@@ -20,7 +20,7 @@ export default function Admin() {
     code: "", discount_type: "percent", discount_value: 10, min_order: 0, max_uses: 100
   });
 
-  const ADMIN_PASS = "elara2024";
+
   const TABS = ["overview", "orders", "reviews", "subscribers", "coupons", "users"];
 
   const load = async () => {
@@ -61,6 +61,17 @@ export default function Admin() {
     await api.delete("/orders/reset");
     load();
   };
+
+  const handlePasswordSubmit = async () => {
+  try {
+    const response = await api.post('/admin/verify', { password: pass });
+    if (response.data.success) {
+      setAuth(true);
+    }
+  } catch (error) {
+    alert('Incorrect password');
+  }
+};
 
   const exportCSV = () => {
     const headers = ["Order #", "Customer", "Email", "Items", "Total (EUR)", "Payment", "Status", "Date"];
@@ -104,12 +115,12 @@ export default function Admin() {
           <h1 className="font-serif text-3xl text-palm mb-2">Admin</h1>
           <p className="text-palm/50 text-sm mb-8 font-serif italic">Atelier back office</p>
           <input type="password" value={pass}
-            onChange={e => setPass(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && (pass === ADMIN_PASS ? setAuth(true) : alert("Wrong password"))}
-            placeholder="Enter password"
-            className="w-full bg-transparent border-b border-palm/30 py-2 text-palm focus:outline-none focus:border-gold text-center mb-6" />
-          <button onClick={() => pass === ADMIN_PASS ? setAuth(true) : alert("Wrong password")}
-            className="btn-elara w-full justify-center">Enter</button>
+  onChange={e => setPass(e.target.value)}
+  onKeyDown={e => e.key === "Enter" && handlePasswordSubmit()}
+  placeholder="Enter password"
+  className="w-full bg-transparent border-b border-palm/30 py-2 text-palm focus:outline-none focus:border-gold text-center mb-6" />
+<button onClick={handlePasswordSubmit}
+  className="btn-elara w-full justify-center">Enter</button>
         </div>
       </main>
     );

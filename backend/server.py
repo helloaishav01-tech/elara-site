@@ -336,6 +336,15 @@ async def newsletter_count():
     n = await db.newsletter.count_documents({})
     return {"count": n}
 
+# Admin authentication endpoint
+@app.post("/api/admin/verify")
+async def verify_admin(credentials: dict):
+    admin_password = os.environ.get("ADMIN_PASSWORD", "elara2024")
+    
+    if credentials.get("password") == admin_password:
+        return {"success": True, "message": "Admin authenticated"}
+    else:
+        raise HTTPException(status_code=401, detail="Invalid admin password")
 
 # ── Reviews ──
 @api_router.get("/reviews", response_model=List[Review])
@@ -528,6 +537,15 @@ async def list_users():
     users = await db.users.find({}, {"_id": 0, "hashed_password": 0}).sort("created_at", -1).to_list(500)
     return users
 
+# Admin authentication endpoint
+@app.post("/api/admin/verify")
+async def verify_admin(credentials: dict):
+    admin_password = os.environ.get("ADMIN_PASSWORD", "elara2024")
+    
+    if credentials.get("password") == admin_password:
+        return {"success": True, "message": "Admin authenticated"}
+    else:
+        raise HTTPException(status_code=401, detail="Invalid admin password")
 
 # ─────────────────────────────────────────
 # REGISTER + MIDDLEWARE
