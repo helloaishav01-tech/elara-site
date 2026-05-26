@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../lib/CartContext";
+import { useAuth } from "../lib/AuthContext";
 import Reveal from "../components/Reveal";
 import { Check, AlertCircle } from "lucide-react";
 
@@ -32,22 +33,28 @@ const Field = ({ name, label, value, onChange, placeholder = "", maxLength, col2
     )}
   </div>
 );
-
 export default function Checkout() {
   const { cart, total, clearCart } = useCart();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-export default function Checkout() {
-  const { cart, total, clearCart } = useCart();
-  const navigate = useNavigate();
+  // Redirect to login if not authenticated
+useEffect(() => {
+  if (!user) {
+    navigate('/login?redirect=/checkout');
+  }
+}, [user, navigate]);
+
+useEffect(() => {
+  loadRazorpayScript();
+}, []);
+
   
   // ← ADD THIS
   useEffect(() => {
     loadRazorpayScript();
   }, []);
   // ← END
-  
-  const [step, setStep] = useState(0);
   
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState({});
@@ -517,4 +524,4 @@ export default function Checkout() {
       </div>
     </main>
   );
-} }
+} 

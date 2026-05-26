@@ -12,6 +12,14 @@ export default function Admin() {
   const [coupons, setCoupons] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [users, setUsers] = useState([]);
+
+  const [products, setProducts] = useState([]);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [newProduct, setNewProduct] = useState({
+  name: "", brand: "", price: 0, category: "", description: "",
+  sizes: [], image: "", stock: 100, featured: false
+});
+
   const [tab, setTab] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [auth, setAuth] = useState(false);
@@ -21,38 +29,40 @@ export default function Admin() {
   });
 
 
-  const TABS = ["overview", "orders", "reviews", "subscribers", "coupons", "users"];
+  const TABS = ["overview", "orders", "products", "reviews", "subscribers", "coupons", "users"];
 
   const load = async () => {
-    setLoading(true);
-    try {
-      const [orderStats, orderList, reviewList, subCount, couponList, userList] = await Promise.all([
-        api.get("/orders/stats").then(r => r.data).catch(() => ({ total_orders: 0, total_revenue: 0, pending: 0, completed: 0 })),
-        api.get("/orders").then(r => r.data).catch(() => []),
-        api.get("/reviews").then(r => r.data).catch(() => []),
-        api.get("/newsletter/count").then(r => r.data.count).catch(() => 0),
-        api.get("/coupons").then(r => r.data).catch(() => []),
-        api.get("/users").then(r => r.data).catch(() => []),
-      ]);
-      setStats(orderStats);
-      setOrders(orderList);
-      setReviews(reviewList);
-      setSubscribers(subCount);
-      setCoupons(couponList);
-      setUsers(userList);
+  setLoading(true);
+  try {
+    const [orderStats, orderList, productList, reviewList, subCount, couponList, userList] = await Promise.all([
+      api.get("/orders/stats").then(r => r.data).catch(() => ({ total_orders: 0, total_revenue: 0, pending: 0, completed: 0 })),
+      api.get("/orders").then(r => r.data).catch(() => []),
+      api.get("/products").then(r => r.data).catch(() => []),
+      api.get("/reviews").then(r => r.data).catch(() => []),
+      api.get("/newsletter/count").then(r => r.data.count).catch(() => 0),
+      api.get("/coupons").then(r => r.data).catch(() => []),
+      api.get("/users").then(r => r.data).catch(() => []),
+    ]);
+    setStats(orderStats);
+    setOrders(orderList);
+    setProducts(productList);
+    setReviews(reviewList);
+    setSubscribers(subCount);
+    setCoupons(couponList);
+    setUsers(userList);
 
-      const grouped = {};
-      orderList.forEach(o => {
-        const date = new Date(o.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-        if (!grouped[date]) grouped[date] = { date, revenue: 0, orders: 0 };
-        grouped[date].revenue += o.total || 0;
-        grouped[date].orders += 1;
-      });
-      setChartData(Object.values(grouped).slice(-14));
-    } finally {
-      setLoading(false);
-    }
-  };
+    const grouped = {};
+    orderList.forEach(o => {
+      const date = new Date(o.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+      if (!grouped[date]) grouped[date] = { date, revenue: 0, orders: 0 };
+      grouped[date].revenue += o.total || 0;
+      grouped[date].orders += 1;
+    });
+    setChartData(Object.values(grouped).slice(-14));
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => { if (auth) load(); }, [auth]);
 
@@ -327,6 +337,183 @@ export default function Admin() {
                 )}
               </div>
             )}
+
+{/* ── PRODUCTS ── */}
+{tab === "products" && (
+  <div className="space-y-6">
+    {/* Add/Edit Product Form */}
+    <div className="elara-glass p-8 rounded-md">
+      <p className="text-[0.65rem] tracking-[0.3em] uppercase text-gold mb-6">
+        {editingProduct ? "Edit Product" : "Add New Product"}
+      </p>
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <label className="text-[0.6rem] tracking-widest uppercase text-palm/60 block mb-1">Product Name *</label>
+          <input value={editingProduct?.name || newProduct.name}
+            onChange={e => editingProduct 
+              ? setEditingProduct({...editingProduct, name: e.target.value})
+              : setNewProduct(p => ({...p, name: e.target.value}))}
+            placeholder="Soirée Pump"
+            className="w-full bg-transparent border-b border-palm/30 focus:border-gold py-2 text-palm focus:outline-none text-sm" />
+        </div>
+        <div>
+          <label className="text-[0.6rem] tracking-widest uppercase text-palm/60 block mb-1">Brand *</label>
+          <input value={editingProduct?.brand || newProduct.brand}
+            onChange={e => editingProduct
+              ? setEditingProduct({...editingProduct, brand: e.target.value})
+              : setNewProduct(p => ({...p, brand: e.target.value}))}
+            placeholder="Manolo Blahnik"
+            className="w-full bg-transparent border-b border-palm/30 focus:border-gold py-2 text-palm focus:outline-none text-sm" />
+        </div>
+        <div>
+          <label className="text-[0.6rem] tracking-widest uppercase text-palm/60 block mb-1">Price (EUR) *</label>
+          <input type="number" value={editingProduct?.price || newProduct.price}
+            onChange={e => editingProduct
+              ? setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})
+              : setNewProduct(p => ({...p, price: parseFloat(e.target.value)}))}
+            className="w-full bg-transparent border-b border-palm/30 focus:border-gold py-2 text-palm focus:outline-none text-sm" />
+        </div>
+        <div>
+          <label className="text-[0.6rem] tracking-widest uppercase text-palm/60 block mb-1">Category *</label>
+          <select value={editingProduct?.category || newProduct.category}
+            onChange={e => editingProduct
+              ? setEditingProduct({...editingProduct, category: e.target.value})
+              : setNewProduct(p => ({...p, category: e.target.value}))}
+            className="w-full bg-cream border-b border-palm/30 focus:border-gold py-2 text-palm focus:outline-none text-sm">
+            <option value="">Select category</option>
+            <option value="heels">Heels</option>
+            <option value="mules">Mules</option>
+            <option value="sandals">Sandals</option>
+            <option value="flats">Flats</option>
+            <option value="boots">Boots</option>
+            <option value="evening">Evening</option>
+          </select>
+        </div>
+        <div className="col-span-2">
+          <label className="text-[0.6rem] tracking-widest uppercase text-palm/60 block mb-1">Image URL</label>
+          <input value={editingProduct?.image || newProduct.image}
+            onChange={e => editingProduct
+              ? setEditingProduct({...editingProduct, image: e.target.value})
+              : setNewProduct(p => ({...p, image: e.target.value}))}
+            placeholder="https://example.com/shoe.jpg"
+            className="w-full bg-transparent border-b border-palm/30 focus:border-gold py-2 text-palm focus:outline-none text-sm" />
+        </div>
+        <div className="col-span-2">
+          <label className="text-[0.6rem] tracking-widest uppercase text-palm/60 block mb-1">Description</label>
+          <textarea value={editingProduct?.description || newProduct.description}
+            onChange={e => editingProduct
+              ? setEditingProduct({...editingProduct, description: e.target.value})
+              : setNewProduct(p => ({...p, description: e.target.value}))}
+            rows={3}
+            className="w-full bg-transparent border border-palm/30 focus:border-gold p-2 text-palm focus:outline-none text-sm rounded" />
+        </div>
+        <div>
+          <label className="text-[0.6rem] tracking-widest uppercase text-palm/60 block mb-1">Sizes (comma separated)</label>
+          <input value={editingProduct?.sizes?.join(", ") || newProduct.sizes.join(", ")}
+            onChange={e => {
+              const sizes = e.target.value.split(",").map(s => s.trim()).filter(Boolean);
+              editingProduct
+                ? setEditingProduct({...editingProduct, sizes})
+                : setNewProduct(p => ({...p, sizes}));
+            }}
+            placeholder="35, 36, 37, 38, 39, 40"
+            className="w-full bg-transparent border-b border-palm/30 focus:border-gold py-2 text-palm focus:outline-none text-sm" />
+        </div>
+        <div>
+          <label className="text-[0.6rem] tracking-widest uppercase text-palm/60 block mb-1">Stock</label>
+          <input type="number" value={editingProduct?.stock || newProduct.stock}
+            onChange={e => editingProduct
+              ? setEditingProduct({...editingProduct, stock: parseInt(e.target.value)})
+              : setNewProduct(p => ({...p, stock: parseInt(e.target.value)}))}
+            className="w-full bg-transparent border-b border-palm/30 focus:border-gold py-2 text-palm focus:outline-none text-sm" />
+        </div>
+      </div>
+      
+      <div className="flex gap-3">
+        {editingProduct ? (
+          <>
+            <button onClick={async () => {
+              try {
+                await api.put(`/products/${editingProduct.id}`, editingProduct);
+                setProducts(prev => prev.map(p => p.id === editingProduct.id ? editingProduct : p));
+                setEditingProduct(null);
+              } catch (e) {
+                alert("Failed to update product");
+              }
+            }} className="btn-elara">Save Changes</button>
+            <button onClick={() => setEditingProduct(null)} className="btn-elara-outline">Cancel</button>
+          </>
+        ) : (
+          <button onClick={async () => {
+            try {
+              const res = await api.post("/products", newProduct);
+              setProducts(prev => [...prev, res.data]);
+              setNewProduct({ name: "", brand: "", price: 0, category: "", description: "", sizes: [], image: "", stock: 100, featured: false });
+            } catch (e) {
+              alert("Failed to create product");
+            }
+          }} className="btn-elara">Add Product ✦</button>
+        )}
+      </div>
+    </div>
+
+    {/* Products List */}
+    <div className="elara-glass rounded-md overflow-hidden">
+      <div className="p-6 border-b border-gold/10 flex items-center gap-3">
+        <Package className="w-4 h-4 text-gold" />
+        <p className="text-[0.65rem] tracking-[0.3em] uppercase text-gold">All Products ({products.length})</p>
+      </div>
+      {products.length === 0 ? (
+        <p className="text-center font-serif italic text-palm/50 py-16">No products yet.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gold/10">
+                {["Image", "Name", "Brand", "Category", "Price", "Stock", "Actions"].map(h => (
+                  <th key={h} className="text-left px-6 py-4 text-[0.6rem] tracking-[0.3em] uppercase text-palm/50">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {products.map(p => (
+                <tr key={p.id} className="border-b border-gold/10 hover:bg-cream/40 transition-colors">
+                  <td className="px-6 py-4">
+                    {p.image ? (
+                      <img src={p.image} alt={p.name} className="w-12 h-12 object-cover rounded" />
+                    ) : (
+                      <div className="w-12 h-12 bg-dolce rounded flex items-center justify-center text-xs text-willow">No img</div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 font-serif text-palm">{p.name}</td>
+                  <td className="px-6 py-4 text-palm/70">{p.brand}</td>
+                  <td className="px-6 py-4 text-palm/70 capitalize">{p.category}</td>
+                  <td className="px-6 py-4 font-serif text-palm">€{p.price}</td>
+                  <td className="px-6 py-4 text-palm/70">{p.stock}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex gap-2">
+                      <button onClick={() => setEditingProduct(p)}
+                        className="text-pines text-xs hover:text-pines/70 border border-pines/30 px-2 py-1 rounded">
+                        Edit
+                      </button>
+                      <button onClick={async () => {
+                        if (!window.confirm("Delete this product?")) return;
+                        await api.delete(`/products/${p.id}`);
+                        setProducts(prev => prev.filter(x => x.id !== p.id));
+                      }} className="text-red-400 text-xs hover:text-red-600 border border-red-400/30 px-2 py-1 rounded">
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  </div>
+)}
 
             {/* ── REVIEWS ── */}
             {tab === "reviews" && (

@@ -353,6 +353,64 @@ async def verify_admin(credentials: dict):
     else:
         raise HTTPException(status_code=401, detail="Invalid admin password")
 
+# ═══════════════════════════════════════════════════════════
+# PRODUCTS CRUD
+# ═══════════════════════════════════════════════════════════
+
+class Product(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    brand: str
+    price: float
+    category: str
+    description: str = ""
+    sizes: list[str] = []
+    image: str = ""  # URL or base64
+    stock: int = 100
+    featured: bool = False
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    
+    model_config = ConfigDict(extra="ignore")
+
+@app.get("/api/products")
+async def get_products():
+    """Get all products"""
+    products = await db.products.find({}, {"_id": 0}).to_list(1000)
+    return products
+
+@app.get("/api/products/{product_id}")
+async def get_product(product_id: str):
+    """Get single product"""
+    product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product
+
+@app.post("/api/products")
+async def create_product(product: Product):
+    """Create new product"""
+    await db.products.insert_one(product.model_dump())
+    return product
+
+@app.put("/api/products/{product_id}")
+async def update_product(product_id: str, product: Product):
+    """Update product"""
+    result = await db.products.update_one(
+        {"id": product_id},
+        {"$set": product.model_dump()}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product
+
+@app.delete("/api/products/{product_id}")
+async def delete_product(product_id: str):
+    """Delete product"""
+    result = await db.products.delete_one({"id": product_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return {"message": "Product deleted", "id": product_id}
+
 # ── Reviews ──
 @api_router.get("/reviews", response_model=List[Review])
 async def list_reviews():
