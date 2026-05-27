@@ -664,10 +664,12 @@ async def verify_admin(credentials: dict):
 # REGISTER + MIDDLEWARE
 # ─────────────────────────────────────────
 app.include_router(api_router)
+origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=origins,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
     allow_methods=["*"],
     allow_headers=["*"],
 )
