@@ -73,6 +73,7 @@ class NewsletterSubscriber(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class ReviewCreate(BaseModel):
+    """Used by the old general /api/reviews POST — kept for backwards compat."""
     name: str
     rating: int = Field(ge=1, le=5)
     text: str
@@ -81,15 +82,28 @@ class ReviewCreate(BaseModel):
     product: Optional[str] = None
 
 class Review(BaseModel):
+    """Stored review document — supports both legacy seed reviews and new product reviews."""
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    # product_id is optional so seed/legacy reviews without it still load fine
+    product_id: Optional[str] = None
     name: str
+    email: Optional[str] = None          # new field, optional for legacy reviews
     rating: int
     text: str
-    location: Optional[str] = None
-    photo_url: Optional[str] = None
-    product: Optional[str] = None
+    location: Optional[str] = None       # legacy field kept
+    photo_url: Optional[str] = None      # URL or base64
+    product: Optional[str] = None        # legacy product-name string kept
+    verified: bool = False
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class ProductReviewCreate(BaseModel):
+    """Payload for POST /api/products/{product_id}/reviews"""
+    name: str
+    email: str
+    rating: int = Field(ge=1, le=5)
+    text: str
+    photo_url: Optional[str] = None      # URL or base64
 
 class OrderCreate(BaseModel):
     items: list
@@ -343,15 +357,6 @@ async def newsletter_count():
     n = await db.newsletter.count_documents({})
     return {"count": n}
 
-# Admin authentication endpoint
-@app.post("/api/admin/verify")
-async def verify_admin(credentials: dict):
-    admin_password = os.environ.get("ADMIN_PASSWORD", "elara2024")
-    
-    if credentials.get("password") == admin_password:
-        return {"success": True, "message": "Admin authenticated"}
-    else:
-        raise HTTPException(status_code=401, detail="Invalid admin password")
 
 # ═══════════════════════════════════════════════════════════
 # PRODUCTS CRUD
@@ -369,18 +374,16 @@ class Product(BaseModel):
     stock: int = 100
     featured: bool = False
     created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
-    
+
     model_config = ConfigDict(extra="ignore")
 
 @app.get("/api/products")
 async def get_products():
-    """Get all products"""
     products = await db.products.find({}, {"_id": 0}).to_list(1000)
     return products
 
 @app.get("/api/products/{product_id}")
 async def get_product(product_id: str):
-    """Get single product"""
     product = await db.products.find_one({"id": product_id}, {"_id": 0})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -388,13 +391,11 @@ async def get_product(product_id: str):
 
 @app.post("/api/products")
 async def create_product(product: Product):
-    """Create new product"""
     await db.products.insert_one(product.model_dump())
     return product
 
 @app.put("/api/products/{product_id}")
 async def update_product(product_id: str, product: Product):
-    """Update product"""
     result = await db.products.update_one(
         {"id": product_id},
         {"$set": product.model_dump()}
@@ -405,13 +406,60 @@ async def update_product(product_id: str, product: Product):
 
 @app.delete("/api/products/{product_id}")
 async def delete_product(product_id: str):
-    """Delete product"""
     result = await db.products.delete_one({"id": product_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Product not found")
     return {"message": "Product deleted", "id": product_id}
 
-# ── Reviews ──
+
+# ═══════════════════════════════════════════════════════════
+# PRODUCT-SPECIFIC REVIEWS
+# ═══════════════════════════════════════════════════════════
+
+@app.get("/api/products/{product_id}/reviews")
+async def get_product_reviews(product_id: str):
+    """Get all reviews for a specific product, with rating summary."""
+    reviews = await db.reviews.find(
+        {"product_id": product_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(1000)
+
+    if not reviews:
+        return {"reviews": [], "summary": None}
+
+    ratings = [r.get("rating", 0) for r in reviews]
+    avg = sum(ratings) / len(ratings)
+    summary = {
+        "average": round(avg, 1),
+        "total": len(reviews),
+        "breakdown": {str(n): sum(1 for r in ratings if r == n) for n in range(5, 0, -1)},
+    }
+    return {"reviews": reviews, "summary": summary}
+
+@app.post("/api/products/{product_id}/reviews")
+async def create_product_review(product_id: str, payload: ProductReviewCreate):
+    """Submit a review for a specific product."""
+    # Check product exists
+    product = await db.products.find_one({"id": product_id}, {"_id": 0, "name": 1})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    review = Review(
+        product_id=product_id,
+        name=payload.name,
+        email=payload.email,
+        rating=payload.rating,
+        text=payload.text,
+        photo_url=payload.photo_url or "",
+        product=product.get("name"),   # store product name for display convenience
+    )
+    await db.reviews.insert_one(review.model_dump())
+    # Return without _id
+    result = review.model_dump()
+    return {"message": "Review submitted", "review": result}
+
+
+# ── General Reviews (legacy endpoints kept) ──
 @api_router.get("/reviews", response_model=List[Review])
 async def list_reviews():
     items = await db.reviews.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
@@ -602,15 +650,15 @@ async def list_users():
     users = await db.users.find({}, {"_id": 0, "hashed_password": 0}).sort("created_at", -1).to_list(500)
     return users
 
-# Admin authentication endpoint
+# Admin authentication endpoint (registered on app directly, not api_router)
 @app.post("/api/admin/verify")
 async def verify_admin(credentials: dict):
     admin_password = os.environ.get("ADMIN_PASSWORD", "elara2024")
-    
     if credentials.get("password") == admin_password:
         return {"success": True, "message": "Admin authenticated"}
     else:
         raise HTTPException(status_code=401, detail="Invalid admin password")
+
 
 # ─────────────────────────────────────────
 # REGISTER + MIDDLEWARE

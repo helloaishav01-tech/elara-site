@@ -3,6 +3,7 @@ import { Eye, ShoppingBag, Heart } from "lucide-react";
 import { useCart } from "../lib/CartContext";
 import { useWishlist } from "../lib/WishlistContext";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 export default function ProductCard({ product, onQuickView }) {
   const { addToCart } = useCart();
@@ -26,22 +27,27 @@ export default function ProductCard({ product, onQuickView }) {
   return (
     <article className="elara-card group" data-testid={`product-card-${product.id}`}>
       <div className="relative">
-        {product.image ? (
-          <img src={product.image} alt={product.name}
-            className="w-full aspect-[3/4] object-cover transition-transform duration-700 group-hover:scale-[1.04]" />
-        ) : (
-          <div className="elara-placeholder"><span>Add Shoe Image</span></div>
-        )}
+
+        {/* ← Clickable image links to product detail */}
+        <Link to={`/product/${product.id}`}>
+          {product.image ? (
+            <img src={product.image} alt={product.name}
+              className="w-full aspect-[3/4] object-cover transition-transform duration-700 group-hover:scale-[1.04]" />
+          ) : (
+            <div className="elara-placeholder"><span>Add Shoe Image</span></div>
+          )}
+        </Link>
+
         {product.badge && (
           <span className="absolute top-4 left-4 px-3 py-1 bg-cream/90 text-palm text-[0.6rem] tracking-[0.25em] uppercase border border-gold/40">
             {product.badge}
           </span>
         )}
+
         {/* Wishlist heart */}
         <button
           onClick={() => toggleWishlist(product)}
-          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-cream/80 flex items-center justify-center shadow-sm hover:bg-cream transition-all"
-        >
+          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-cream/80 flex items-center justify-center shadow-sm hover:bg-cream transition-all">
           <Heart className={`w-4 h-4 transition-colors ${wishlisted ? "fill-red-400 text-red-400" : "text-palm/50"}`} />
         </button>
 
@@ -57,18 +63,25 @@ export default function ProductCard({ product, onQuickView }) {
 
       <div className="p-5 text-center">
         <p className="text-[0.6rem] tracking-[0.3em] uppercase text-willow mb-1">{product.brand}</p>
-        <h3 className="font-serif text-xl text-palm leading-tight">{product.name}</h3>
+
+        {/* ← Clickable name links to product detail */}
+        <Link to={`/product/${product.id}`}>
+          <h3 className="font-serif text-xl text-palm leading-tight hover:text-pines transition-colors">
+            {product.name}
+          </h3>
+        </Link>
+
         <p className="text-xs text-palm/55 mt-1 italic">{product.color}</p>
         <p className="text-sm text-palm mt-3 tracking-wider">€ {product.price.toLocaleString()}</p>
 
         {showSizes && (
           <div className="mt-3">
             <div className="flex items-center justify-between mb-2">
-  <p className={`text-[0.6rem] tracking-widest uppercase ${sizeError ? "text-red-400" : "text-willow"}`}>
-    {sizeError ? "Please select a size!" : "Select Size (EU)"}
-  </p>
-  <SizeGuide />
-</div>
+              <p className={`text-[0.6rem] tracking-widest uppercase ${sizeError ? "text-red-400" : "text-willow"}`}>
+                {sizeError ? "Please select a size!" : "Select Size (EU)"}
+              </p>
+              <SizeGuide />
+            </div>
             <div className="flex flex-wrap gap-1 justify-center">
               {product.sizes?.map(size => (
                 <button key={size} onClick={() => { setSelectedSize(size); setSizeError(false); }}

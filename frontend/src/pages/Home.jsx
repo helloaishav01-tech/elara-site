@@ -1,24 +1,51 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Sparkles } from "lucide-react";
 import Petals from "../components/Petals";
 import BrandStrip from "../components/BrandStrip";
 import Reveal from "../components/Reveal";
 import { CATEGORIES } from "../data/products";
+import { api } from "../lib/api";
 import peonyhero from "../images/peony-hero.jpg";
 import floralBg from "../images/floral-bg.jpg";
 import floral2 from "../images/floral-2.jpg";
 
 const FLORAL_BG = <img src={floral2} alt="Flowers" className="w-full h-full object-cover" />;
-const CATEGORY_IMGS = {
-  heels: "https://images.unsplash.com/photo-1515347619252-60a4bf4fff4f?w=600&q=80",
-  mules: "https://images.unsplash.com/photo-1603487742131-4160ec999306?w=600&q=80",
+
+const FALLBACK_IMGS = {
+  heels:   "https://images.unsplash.com/photo-1515347619252-60a4bf4fff4f?w=600&q=80",
+  mules:   "https://images.unsplash.com/photo-1603487742131-4160ec999306?w=600&q=80",
   sandals: "https://images.unsplash.com/photo-1562273138-f46be4ebdf33?w=600&q=80",
-  flats: "https://images.unsplash.com/photo-1544441893-675973e31985?w=600&q=80",
-  boots: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&q=80",
-  evening: <img src={floralBg} alt="Botanical floral" className="w-full aspect-[4/5] object-cover rounded shadow-xl" />
+  flats:   "https://images.unsplash.com/photo-1544441893-675973e31985?w=600&q=80",
+  boots:   "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&q=80",
+  evening: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=600&q=80",
 };
 
 export default function Home() {
+  const [categoryImages, setCategoryImages] = useState({});
+
+  useEffect(() => {
+    const fetchCategoryImages = async () => {
+      try {
+        const response = await api.get("/products");
+        const products = response.data;
+
+        // Use the first product image found for each category
+        const images = {};
+        CATEGORIES.forEach(cat => {
+          const firstProduct = products.find(p => p.category === cat.slug && p.image);
+          images[cat.slug] = firstProduct?.image || FALLBACK_IMGS[cat.slug] || "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=600";
+        });
+
+        setCategoryImages(images);
+      } catch (error) {
+        console.error("Failed to load category images:", error);
+      }
+    };
+
+    fetchCategoryImages();
+  }, []);
+
   return (
     <main data-testid="page-home">
       {/* ===================== HERO ===================== */}
@@ -145,7 +172,7 @@ export default function Home() {
               <Link to={`/collections?cat=${c.slug}`} className="elara-card block group" data-testid={`home-cat-${c.slug}`}>
                 <div className="relative overflow-hidden aspect-[3/4]">
                   <img
-                    src={CATEGORY_IMGS[c.slug]}
+                    src={categoryImages[c.slug] || FALLBACK_IMGS[c.slug] || "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=600"}
                     alt={c.name}
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
                   />

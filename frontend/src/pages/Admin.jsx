@@ -16,9 +16,11 @@ export default function Admin() {
   const [products, setProducts] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
   const [newProduct, setNewProduct] = useState({
-  name: "", brand: "", price: 0, category: "", description: "",
-  sizes: [], image: "", stock: 100, featured: false
-});
+    name: "", brand: "", price: 0, category: "", description: "",
+    sizes: [], image: "", stock: 100, featured: false
+  });
+  // Raw string for sizes input — avoids cursor-jump on comma
+  const [sizesInput, setSizesInput] = useState("");
 
   const [tab, setTab] = useState("overview");
   const [loading, setLoading] = useState(true);
@@ -366,7 +368,7 @@ export default function Admin() {
             className="w-full bg-transparent border-b border-palm/30 focus:border-gold py-2 text-palm focus:outline-none text-sm" />
         </div>
         <div>
-          <label className="text-[0.6rem] tracking-widest uppercase text-palm/60 block mb-1">Price (EUR) *</label>
+          <label className="text-[0.6rem] tracking-widests uppercase text-palm/60 block mb-1">Price (EUR) *</label>
           <input type="number" value={editingProduct?.price || newProduct.price}
             onChange={e => editingProduct
               ? setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})
@@ -390,13 +392,72 @@ export default function Admin() {
           </select>
         </div>
         <div className="col-span-2">
-          <label className="text-[0.6rem] tracking-widest uppercase text-palm/60 block mb-1">Image URL</label>
-          <input value={editingProduct?.image || newProduct.image}
-            onChange={e => editingProduct
-              ? setEditingProduct({...editingProduct, image: e.target.value})
-              : setNewProduct(p => ({...p, image: e.target.value}))}
-            placeholder="https://example.com/shoe.jpg"
-            className="w-full bg-transparent border-b border-palm/30 focus:border-gold py-2 text-palm focus:outline-none text-sm" />
+          <label className="text-[0.6rem] tracking-widest uppercase text-palm/60 block mb-1">Product Image</label>
+          {/* Show file picker + preview when a file has been chosen; show URL input otherwise */}
+          {(() => {
+            const currentImage = editingProduct?.image || newProduct.image;
+            const isBase64 = currentImage?.startsWith("data:");
+            return (
+              <div className="space-y-2">
+                <div className="flex gap-3 items-center">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      if (file.size > 2 * 1024 * 1024) {
+                        alert("Image must be less than 2MB");
+                        e.target.value = "";
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        if (editingProduct) {
+                          setEditingProduct({ ...editingProduct, image: reader.result });
+                        } else {
+                          setNewProduct(p => ({ ...p, image: reader.result }));
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="text-sm text-palm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:bg-pines file:text-cream hover:file:bg-pines/80 cursor-pointer"
+                  />
+                  {isBase64 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (editingProduct) setEditingProduct({ ...editingProduct, image: "" });
+                        else setNewProduct(p => ({ ...p, image: "" }));
+                      }}
+                      className="text-xs text-red-400 hover:text-red-600 border border-red-400/30 px-2 py-1 rounded"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                {/* URL input — only shown when no uploaded file */}
+                {!isBase64 && (
+                  <input
+                    value={currentImage}
+                    onChange={e => editingProduct
+                      ? setEditingProduct({ ...editingProduct, image: e.target.value })
+                      : setNewProduct(p => ({ ...p, image: e.target.value }))}
+                    placeholder="Or paste image URL"
+                    className="w-full bg-transparent border-b border-palm/30 focus:border-gold py-2 text-palm focus:outline-none text-sm"
+                  />
+                )}
+                {/* Preview */}
+                {currentImage && (
+                  <img
+                    src={currentImage}
+                    alt="Preview"
+                    className="w-20 h-20 object-cover rounded border border-gold/30"
+                  />
+                )}
+              </div>
+            );
+          })()}
         </div>
         <div className="col-span-2">
           <label className="text-[0.6rem] tracking-widest uppercase text-palm/60 block mb-1">Description</label>
@@ -409,13 +470,21 @@ export default function Admin() {
         </div>
         <div>
           <label className="text-[0.6rem] tracking-widest uppercase text-palm/60 block mb-1">Sizes (comma separated)</label>
-          <input value={editingProduct?.sizes?.join(", ") || newProduct.sizes.join(", ")}
+          {/* sizesInput is a raw string — no array conversion on each keystroke, so cursor never jumps */}
+          <input
+            value={editingProduct ? (editingProduct.sizes?.join(", ") ?? "") : sizesInput}
             onChange={e => {
-              const sizes = e.target.value.split(",").map(s => s.trim()).filter(Boolean);
-              editingProduct
-                ? setEditingProduct({...editingProduct, sizes})
-                : setNewProduct(p => ({...p, sizes}));
+              if (editingProduct) {
+                // For editing: keep raw string in editingProduct as a temporary _sizesRaw field,
+                // and update sizes array simultaneously without touching cursor
+                setEditingProduct({ ...editingProduct, sizes: e.target.value.split(",").map(s => s.trim()).filter(Boolean), _sizesRaw: e.target.value });
+              } else {
+                setSizesInput(e.target.value);
+                setNewProduct(p => ({ ...p, sizes: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }));
+              }
             }}
+            // For editingProduct, prefer the raw string if available so cursor stays put
+            value={editingProduct ? (editingProduct._sizesRaw ?? editingProduct.sizes?.join(", ") ?? "") : sizesInput}
             placeholder="35, 36, 37, 38, 39, 40"
             className="w-full bg-transparent border-b border-palm/30 focus:border-gold py-2 text-palm focus:outline-none text-sm" />
         </div>
@@ -441,7 +510,7 @@ export default function Admin() {
                 alert("Failed to update product");
               }
             }} className="btn-elara">Save Changes</button>
-            <button onClick={() => setEditingProduct(null)} className="btn-elara-outline">Cancel</button>
+            <button onClick={() => { setEditingProduct(null); }} className="btn-elara-outline">Cancel</button>
           </>
         ) : (
           <button onClick={async () => {
@@ -449,6 +518,7 @@ export default function Admin() {
               const res = await api.post("/products", newProduct);
               setProducts(prev => [...prev, res.data]);
               setNewProduct({ name: "", brand: "", price: 0, category: "", description: "", sizes: [], image: "", stock: 100, featured: false });
+              setSizesInput("");
             } catch (e) {
               alert("Failed to create product");
             }

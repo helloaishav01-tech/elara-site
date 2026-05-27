@@ -23,6 +23,8 @@ import { WishlistProvider } from "./lib/WishlistContext";
 import Admin from "./pages/Admin";
 import OrderTracking from "./pages/OrderTracking";
 import CookieBanner from "./components/CookieBanner";
+import ProductDetail from "./pages/ProductDetail";
+
 
 
 function App() {
@@ -51,6 +53,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/product/:id" element={<ProductDetail />} />
           </Routes>
           <Footer />
           <Toaster richColors position="bottom-right" />

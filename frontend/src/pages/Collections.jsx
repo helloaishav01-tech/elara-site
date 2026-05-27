@@ -1,39 +1,71 @@
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Filter } from "lucide-react";
+import Reveal from "../components/Reveal";
 import ProductCard from "../components/ProductCard";
 import QuickViewDialog from "../components/QuickViewDialog";
-import Reveal from "../components/Reveal";
-import { CATEGORIES, BRANDS, PRODUCTS } from "../data/products";
 import RelatedProducts from "../components/RelatedProducts";
+import { api } from "../lib/api";
 
+const CATEGORIES = [
+  { id: "all",     name: "All",     desc: "Every piece in our collection" },
+  { id: "heels",   name: "Heels",   desc: "Elevated elegance" },
+  { id: "mules",   name: "Mules",   desc: "Effortless sophistication" },
+  { id: "sandals", name: "Sandals", desc: "Summer essentials" },
+  { id: "flats",   name: "Flats",   desc: "Refined comfort" },
+  { id: "boots",   name: "Boots",   desc: "Statement footwear" },
+  { id: "evening", name: "Evening", desc: "Red carpet ready" },
+];
 
 export default function Collections() {
-  const [params, setParams] = useSearchParams();
-  const cat = params.get("cat") || "all";
-  const [brand, setBrand] = useState("all");
-  const [sort, setSort] = useState("featured");
-  const [maxPrice, setMaxPrice] = useState(2000);
-  const [open, setOpen] = useState(null);
+  const [searchParams, setParams] = useSearchParams();
+  const cat = searchParams.get("cat") || "all";
 
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [cat]);
+  const [products, setProducts]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [brand, setBrand]         = useState("all");
+  const [sort, setSort]           = useState("featured");
+  const [maxPrice, setMaxPrice]   = useState(2000);
+  const [open, setOpen]           = useState(null);
+
+  // Derive unique brand list from fetched products
+  const brands = useMemo(
+    () => [...new Set(products.map(p => p.brand).filter(Boolean))],
+    [products]
+  );
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        const response = await api.get("/products");
+        setProducts(response.data);
+      } catch (error) {
+        console.error("Failed to load products:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProducts();
+  }, []);   // fetch once; filtering is done client-side below
 
   const items = useMemo(() => {
-    let list = cat === "all" ? PRODUCTS : PRODUCTS.filter(p => p.category === cat);
+    let list = cat === "all" ? products : products.filter(p => p.category === cat);
     if (brand !== "all") list = list.filter(p => p.brand === brand);
     list = list.filter(p => p.price <= maxPrice);
-    if (sort === "low") list = [...list].sort((a, b) => a.price - b.price);
+    if (sort === "low")  list = [...list].sort((a, b) => a.price - b.price);
     if (sort === "high") list = [...list].sort((a, b) => b.price - a.price);
     return list;
-  }, [cat, brand, sort, maxPrice]);
+  }, [products, cat, brand, sort, maxPrice]);
 
   const setCat = (slug) => {
-    const next = new URLSearchParams(params);
+    const next = new URLSearchParams(searchParams);
     next.set("cat", slug);
     setParams(next);
   };
 
-  const activeName = CATEGORIES.find(c => c.slug === cat)?.name || "All Footwear";
+  // FIXED: was using c.slug — CATEGORIES uses c.id
+  const activeName = CATEGORIES.find(c => c.id === cat)?.name || "All Footwear";
 
   return (
     <main className="pt-32 pb-32" data-testid="page-collections">
@@ -45,7 +77,7 @@ export default function Collections() {
             {activeName}
           </h1>
           <p className="mt-4 max-w-xl text-palm/70 text-sm leading-relaxed">
-            {items.length} pair{items.length === 1 ? "" : "s"} · Curated from {BRANDS.length} maisons.
+            {loading ? "Loading…" : `${items.length} pair${items.length === 1 ? "" : "s"} · Curated from ${brands.length} maisons.`}
           </p>
         </Reveal>
       </section>
@@ -57,24 +89,17 @@ export default function Collections() {
             <p className="text-[0.65rem] tracking-[0.3em] uppercase text-gold mb-4 flex items-center gap-2">
               <Filter className="w-3 h-3" /> Refine
             </p>
+
+            {/* Category */}
             <div>
               <p className="text-[0.6rem] tracking-[0.25em] uppercase text-palm/60 mb-3">Category</p>
               <ul className="space-y-2">
-                <li>
-                  <button
-                    onClick={() => setCat("all")}
-                    className={`text-sm transition-colors ${cat === "all" ? "text-gold" : "text-palm hover:text-gold"}`}
-                    data-testid="filter-cat-all"
-                  >
-                    All Footwear
-                  </button>
-                </li>
                 {CATEGORIES.map(c => (
-                  <li key={c.slug}>
+                  <li key={c.id}>
                     <button
-                      onClick={() => setCat(c.slug)}
-                      className={`text-sm transition-colors ${cat === c.slug ? "text-gold" : "text-palm hover:text-gold"}`}
-                      data-testid={`filter-cat-${c.slug}`}
+                      onClick={() => setCat(c.id)}
+                      className={`text-sm transition-colors ${cat === c.id ? "text-gold" : "text-palm hover:text-gold"}`}
+                      data-testid={`filter-cat-${c.id}`}
                     >
                       {c.name}
                     </button>
@@ -83,6 +108,7 @@ export default function Collections() {
               </ul>
             </div>
 
+            {/* Maison */}
             <div className="mt-6">
               <p className="text-[0.6rem] tracking-[0.25em] uppercase text-palm/60 mb-3">Maison</p>
               <select
@@ -92,10 +118,11 @@ export default function Collections() {
                 data-testid="filter-brand"
               >
                 <option value="all">All maisons</option>
-                {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+                {brands.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
 
+            {/* Price */}
             <div className="mt-6">
               <p className="text-[0.6rem] tracking-[0.25em] uppercase text-palm/60 mb-3">Up to € {maxPrice}</p>
               <input
@@ -106,6 +133,7 @@ export default function Collections() {
               />
             </div>
 
+            {/* Sort */}
             <div className="mt-6">
               <p className="text-[0.6rem] tracking-[0.25em] uppercase text-palm/60 mb-3">Sort</p>
               <select
@@ -124,7 +152,9 @@ export default function Collections() {
 
         {/* Grid */}
         <div className="lg:col-span-9">
-          {items.length === 0 ? (
+          {loading ? (
+            <p className="text-center font-serif italic text-2xl text-palm/60 py-32">Loading…</p>
+          ) : items.length === 0 ? (
             <p className="text-center font-serif italic text-2xl text-palm/60 py-32">No pairs match your reverie.</p>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8" data-testid="collections-grid">
@@ -137,13 +167,15 @@ export default function Collections() {
           )}
         </div>
       </section>
-          {items.length > 0 && (
-  <RelatedProducts
-    currentId={null}
-    category={cat !== "all" ? cat : items[0]?.category}
-    brand={items[0]?.brand}
-  />
-)}
+
+      {items.length > 0 && (
+        <RelatedProducts
+          currentId={null}
+          category={cat !== "all" ? cat : items[0]?.category}
+          brand={items[0]?.brand}
+        />
+      )}
+
       <QuickViewDialog product={open} open={!!open} onOpenChange={(v) => !v && setOpen(null)} />
     </main>
   );
