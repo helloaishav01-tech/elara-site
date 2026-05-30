@@ -377,24 +377,25 @@ class Product(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-@app.get("/api/products")
+@app.get("/products")
+
 async def get_products():
     products = await db.products.find({}, {"_id": 0}).to_list(1000)
     return products
 
-@app.get("/api/products/{product_id}")
+@app.get("/products/{product_id}")
 async def get_product(product_id: str):
     product = await db.products.find_one({"id": product_id}, {"_id": 0})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
-@app.post("/api/products")
+@app.post("/products")
 async def create_product(product: Product):
     await db.products.insert_one(product.model_dump())
     return product
 
-@app.put("/api/products/{product_id}")
+@app.put("/products/{product_id}")
 async def update_product(product_id: str, product: Product):
     result = await db.products.update_one(
         {"id": product_id},
@@ -404,7 +405,7 @@ async def update_product(product_id: str, product: Product):
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
-@app.delete("/api/products/{product_id}")
+@app.delete("/products/{product_id}")
 async def delete_product(product_id: str):
     result = await db.products.delete_one({"id": product_id})
     if result.deleted_count == 0:
@@ -416,7 +417,7 @@ async def delete_product(product_id: str):
 # PRODUCT-SPECIFIC REVIEWS
 # ═══════════════════════════════════════════════════════════
 
-@app.get("/api/products/{product_id}/reviews")
+@app.get("/products/{product_id}/reviews")
 async def get_product_reviews(product_id: str):
     """Get all reviews for a specific product, with rating summary."""
     reviews = await db.reviews.find(
@@ -436,7 +437,7 @@ async def get_product_reviews(product_id: str):
     }
     return {"reviews": reviews, "summary": summary}
 
-@app.post("/api/products/{product_id}/reviews")
+@app.post("/products/{product_id}/reviews")
 async def create_product_review(product_id: str, payload: ProductReviewCreate):
     """Submit a review for a specific product."""
     # Check product exists
@@ -663,7 +664,9 @@ async def verify_admin(credentials: dict):
 # ─────────────────────────────────────────
 # REGISTER + MIDDLEWARE
 # ─────────────────────────────────────────
-app.include_router(api_router)
+# ─────────────────────────────────────────
+# REGISTER + MIDDLEWARE
+# ─────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -671,3 +674,4 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(api_router)
