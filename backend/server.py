@@ -276,24 +276,29 @@ async def health():
 # ── Auth ──
 @api_router.post("/auth/register")
 async def register(payload: UserRegister):
-    email = payload.email.strip().lower()
-    if "@" not in email:
-        raise HTTPException(status_code=400, detail="Invalid email")
-    if len(payload.password) < 6:
-        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
-    existing = await db.users.find_one({"email": email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    user = User(
-        email=email,
-        first_name=payload.first_name.strip(),
-        last_name=payload.last_name.strip(),
-        hashed_password=hash_password(payload.password)
-    )
-    await db.users.insert_one(user.model_dump())
-    token = create_token({"sub": user.id})
-    return {"token": token, "user": {"id": user.id, "email": user.email, "first_name": user.first_name, "last_name": user.last_name}}
-
+    try:
+        email = payload.email.strip().lower()
+        if "@" not in email:
+            raise HTTPException(status_code=400, detail="Invalid email")
+        if len(payload.password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        existing = await db.users.find_one({"email": email})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        user = User(
+            email=email,
+            first_name=payload.first_name.strip(),
+            last_name=payload.last_name.strip(),
+            hashed_password=hash_password(payload.password)
+        )
+        await db.users.insert_one(user.model_dump())
+        token = create_token({"sub": user.id})
+        return {"token": token, "user": {"id": user.id, "email": user.email, "first_name": user.first_name, "last_name": user.last_name}}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Register error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)}")
 @api_router.post("/auth/login")
 async def login(payload: UserLogin):
     email = payload.email.strip().lower()
