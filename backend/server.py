@@ -1,4 +1,5 @@
 import resend
+import requests  # ← ADD THIS LINE
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter, HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
