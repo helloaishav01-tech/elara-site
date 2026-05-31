@@ -50,11 +50,6 @@ useEffect(() => {
 }, []);
 
   
-  // ← ADD THIS
-  useEffect(() => {
-    loadRazorpayScript();
-  }, []);
-  // ← END
   
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState({});
@@ -180,14 +175,27 @@ useEffect(() => {
         discount: discount
       })
     });
-    
+
+    if (!orderRes.ok) {
+      const err = await orderRes.json();
+      throw new Error(err.detail || "Order creation failed");
+    }
+
     const order = await orderRes.json();
 
-    // If UPI/Card - open Razorpay
+    // Open Razorpay for card/upi/gpay
     if (paymentMethod === "card" || paymentMethod === "upi" || paymentMethod === "gpay") {
+      // Make sure Razorpay is loaded
+      if (!window.Razorpay) {
+        await loadRazorpayScript();
+      }
+      if (!window.Razorpay) {
+        throw new Error("Razorpay failed to load. Please refresh and try again.");
+      }
+
       const options = {
         key: process.env.REACT_APP_RAZORPAY_KEY_ID,
-        amount: Math.round(grandTotal * 100), // paise
+        amount: Math.round(grandTotal * 100),
         currency: "INR",
         name: "ELARA Atelier",
         description: `Order #${order.order_number}`,
@@ -200,20 +208,25 @@ useEffect(() => {
           email: shipping.email,
           contact: shipping.phone
         },
-        theme: { color: "#c9a96e" }
+        theme: { color: "#c9a96e" },
+        modal: {
+          ondismiss: function() {
+            console.log("Payment cancelled");
+          }
+        }
       };
-      
-      const razorpay = new window.Razorpay(options);
-      razorpay.open();
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
     } else {
-      // PayPal or other - skip payment for now
+      // PayPal or other
       clearCart();
       navigate(`/order-confirmation?order=${order.order_number}`);
     }
-    
+
   } catch (e) {
     console.error("Order failed", e);
-    alert("Failed to place order. Please try again.");
+    alert(e.message || "Failed to place order. Please try again.");
   }
 };
 
