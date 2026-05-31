@@ -266,7 +266,13 @@ api_router = APIRouter(prefix="/api")
 async def root():
     return {"brand": "ELARA", "tagline": "Where flowers bloom underfoot"}
 
-
+@api_router.get("/health")
+async def health():
+    try:
+        await db.command("ping")
+        return {"status": "ok", "mongo": "connected"}
+    except Exception as e:
+        return {"status": "error", "mongo": str(e)}
 # ── Auth ──
 @api_router.post("/auth/register")
 async def register(payload: UserRegister):
