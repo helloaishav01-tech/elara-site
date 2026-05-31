@@ -39,18 +39,25 @@ def send_email(to_email: str, subject: str, html_body: str):
         if not api_key:
             logger.warning("RESEND_API_KEY not set — skipping email")
             return
-        resend.api_key = api_key
-        params = {
-            "from": "ELARA Atelier <onboarding@resend.dev>",
-            "to": [to_email],
-            "subject": subject,
-            "html": html_body,
-        }
-        resend.Emails.send(params)
-        logger.info(f"Email sent to {to_email}")
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "from": "ELARA Atelier <onboarding@resend.dev>",
+                "to": [to_email],
+                "subject": subject,
+                "html": html_body
+            }
+        )
+        if response.status_code == 200:
+            logger.info(f"Email sent to {to_email}")
+        else:
+            logger.error(f"Email failed: {response.status_code} {response.text}")
     except Exception as e:
         logger.error(f"Email failed: {e}")
-
 
 class NewsletterCreate(BaseModel):
     email: str
