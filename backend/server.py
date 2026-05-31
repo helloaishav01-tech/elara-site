@@ -267,13 +267,6 @@ async def health():
         return {"status": "ok", "mongo": "connected"}
     except Exception as e:
         return {"status": "error", "mongo": str(e)}
-    
-    @api_router.get("/test-email")
-async def test_email():
-    api_key = os.environ.get("RESEND_API_KEY")
-    if not api_key:
-        return {"error": "RESEND_API_KEY not set!"}
-    return {"key_found": True, "key_preview": api_key[:8] + "..."}
 
 
 @api_router.post("/auth/register")
@@ -618,6 +611,14 @@ async def verify_admin(credentials: dict):
         return {"success": True, "message": "Admin authenticated"}
     else:
         raise HTTPException(status_code=401, detail="Invalid admin password")
+
+
+@api_router.get("/test-email")
+async def test_email():
+    api_key = os.environ.get("RESEND_API_KEY")
+    if not api_key:
+        return {"error": "RESEND_API_KEY not set!"}
+    return {"key_found": True, "key_preview": api_key[:8] + "..."}
 
 
 app.include_router(api_router)
