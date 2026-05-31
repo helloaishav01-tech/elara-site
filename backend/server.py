@@ -1,7 +1,5 @@
-import smtplib
+import resend
 from contextlib import asynccontextmanager
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from fastapi import FastAPI, APIRouter, HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -37,21 +35,18 @@ razorpay_client = razorpay.Client(
 
 def send_email(to_email: str, subject: str, html_body: str):
     try:
-        sender = os.environ.get("EMAIL_USER")
-        password = os.environ.get("EMAIL_PASS")
-        if not sender or not password:
-            logger.warning("Email credentials not set — skipping email")
+        api_key = os.environ.get("RESEND_API_KEY")
+        if not api_key:
+            logger.warning("RESEND_API_KEY not set — skipping email")
             return
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"ELARA Atelier <{sender}>"
-        msg["To"] = to_email
-        msg.attach(MIMEText(html_body, "html"))
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(sender, password)
-            server.sendmail(sender, to_email, msg.as_string())
+        resend.api_key = api_key
+        params = {
+            "from": "ELARA Atelier <onboarding@resend.dev>",
+            "to": [to_email],
+            "subject": subject,
+            "html": html_body,
+        }
+        resend.Emails.send(params)
         logger.info(f"Email sent to {to_email}")
     except Exception as e:
         logger.error(f"Email failed: {e}")
@@ -252,7 +247,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="ELARA API", lifespan=lifespan)
 api_router = APIRouter(prefix="/api")
 
-# ── CORS FIRST ──
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -262,7 +256,6 @@ app.add_middleware(
 )
 
 
-# ── Root ──
 @api_router.get("/")
 async def root():
     return {"brand": "ELARA", "tagline": "Where flowers bloom underfoot"}
@@ -276,7 +269,6 @@ async def health():
         return {"status": "error", "mongo": str(e)}
 
 
-# ── Auth ──
 @api_router.post("/auth/register")
 async def register(payload: UserRegister):
     try:
@@ -336,7 +328,6 @@ async def get_my_orders(current_user=Depends(get_current_user)):
     return orders
 
 
-# ── Newsletter ──
 @api_router.post("/newsletter", response_model=NewsletterSubscriber)
 async def subscribe_newsletter(payload: NewsletterCreate):
     email = payload.email.strip().lower()
@@ -373,7 +364,6 @@ async def newsletter_count():
     return {"count": n}
 
 
-# ── Products ──
 @api_router.get("/products")
 async def get_products():
     products = await db.products.find({}, {"_id": 0}).to_list(1000)
@@ -409,7 +399,6 @@ async def delete_product(product_id: str):
     return {"message": "Product deleted", "id": product_id}
 
 
-# ── Product Reviews ──
 @api_router.get("/products/{product_id}/reviews")
 async def get_product_reviews(product_id: str):
     reviews = await db.reviews.find(
@@ -444,7 +433,6 @@ async def create_product_review(product_id: str, payload: ProductReviewCreate):
     return {"message": "Review submitted", "review": review.model_dump()}
 
 
-# ── General Reviews ──
 @api_router.get("/reviews", response_model=List[Review])
 async def list_reviews():
     items = await db.reviews.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
@@ -472,7 +460,6 @@ async def reviews_summary():
     return {"total": total, "average": round(sum_r / total, 2), "breakdown": breakdown}
 
 
-# ── Orders ──
 @api_router.post("/orders")
 async def create_order(payload: OrderCreate):
     count = await db.orders.count_documents({})
@@ -497,22 +484,6 @@ async def create_order(payload: OrderCreate):
       <p style="color: #6a823e; line-height: 1.8; margin-bottom: 24px;">
         Your order #{1001 + count} has been received and is being prepared with care.
       </p>
-      <div style="background: #f0ece4; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-        <p style="color: #c9a96e; font-size: 10px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 12px;">Order Summary</p>
-        {"".join([f'<div style="padding: 8px 0; border-bottom: 1px solid #e6b1c430;"><span style="color:#364023">{item.get("name","")} x {item.get("quantity",1)} - E {item.get("price",0) * item.get("quantity",1):,.0f}</span></div>' for item in payload.items])}
-        <div style="padding: 12px 0 0 0;">
-          <span style="color:#364023; font-size: 10px; letter-spacing: 2px; text-transform: uppercase;">Total: </span>
-          <span style="color:#364023; font-size: 20px; font-style: italic;">E {payload.total:,.0f}</span>
-        </div>
-      </div>
-      <div style="background: #f0ece4; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
-        <p style="color: #c9a96e; font-size: 10px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 12px;">Shipping To</p>
-        <p style="color: #364023; line-height: 1.8; margin: 0;">
-          {payload.shipping.get('firstName','')} {payload.shipping.get('lastName','')}<br>
-          {payload.shipping.get('address','')}, {payload.shipping.get('city','')}<br>
-          {payload.shipping.get('zip','')}, {payload.shipping.get('country','')}
-        </p>
-      </div>
       <a href="https://elara-site-rho.vercel.app/track"
         style="background: #364023; color: #faf6f0; padding: 14px 32px; border-radius: 999px;
                text-decoration: none; font-size: 11px; letter-spacing: 3px; text-transform: uppercase; display: inline-block;">
@@ -553,7 +524,7 @@ async def track_order(q: str):
 @api_router.delete("/orders/reset")
 async def reset_orders():
     await db.orders.delete_many({})
-    return {"message": "All orders cleared. Counter reset to #1001."}
+    return {"message": "All orders cleared."}
 
 @api_router.get("/orders")
 async def list_orders():
@@ -575,7 +546,6 @@ async def update_order_status(order_id: str, payload: dict):
     return {"message": "Updated"}
 
 
-# ── Coupons ──
 @api_router.post("/coupons")
 async def create_coupon(payload: CouponCreate):
     existing = await db.coupons.find_one({"code": payload.code.upper()})
@@ -604,7 +574,7 @@ async def validate_coupon(payload: dict):
     if coupon.get("uses", 0) >= coupon.get("max_uses", 100):
         raise HTTPException(status_code=400, detail="Coupon has reached its usage limit")
     if order_total < coupon.get("min_order", 0):
-        raise HTTPException(status_code=400, detail=f"Minimum order E{coupon['min_order']} required")
+        raise HTTPException(status_code=400, detail=f"Minimum order required")
     if coupon["discount_type"] == "percent":
         discount = round(order_total * coupon["discount_value"] / 100, 2)
     else:
@@ -629,13 +599,11 @@ async def delete_coupon(code: str):
     return {"message": "Deleted"}
 
 
-# ── Users ──
 @api_router.get("/users")
 async def list_users():
     users = await db.users.find({}, {"_id": 0, "hashed_password": 0}).sort("created_at", -1).to_list(500)
     return users
 
-# ── Admin ──
 @api_router.post("/admin/verify")
 async def verify_admin(credentials: dict):
     admin_password = os.environ.get("ADMIN_PASSWORD", "elara2024")
@@ -645,5 +613,4 @@ async def verify_admin(credentials: dict):
         raise HTTPException(status_code=401, detail="Invalid admin password")
 
 
-# ── Register router ──
 app.include_router(api_router)
