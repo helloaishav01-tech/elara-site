@@ -267,6 +267,13 @@ async def health():
         return {"status": "ok", "mongo": "connected"}
     except Exception as e:
         return {"status": "error", "mongo": str(e)}
+    
+    @api_router.get("/test-email")
+async def test_email():
+    api_key = os.environ.get("RESEND_API_KEY")
+    if not api_key:
+        return {"error": "RESEND_API_KEY not set!"}
+    return {"key_found": True, "key_preview": api_key[:8] + "..."}
 
 
 @api_router.post("/auth/register")
