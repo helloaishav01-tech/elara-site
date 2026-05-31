@@ -28,16 +28,13 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Razorpay client
 razorpay_client = razorpay.Client(
     auth=(
         os.environ.get("RAZORPAY_KEY_ID", "rzp_test_StJwGj5ruwAviX"),
         os.environ.get("RAZORPAY_KEY_SECRET", "")
     )
 )
-# ─────────────────────────────────────────
-# EMAIL
-# ─────────────────────────────────────────
+
 def send_email(to_email: str, subject: str, html_body: str):
     try:
         sender = os.environ.get("EMAIL_USER")
@@ -58,9 +55,6 @@ def send_email(to_email: str, subject: str, html_body: str):
         logger.error(f"Email failed: {e}")
 
 
-# ─────────────────────────────────────────
-# MODELS
-# ─────────────────────────────────────────
 class NewsletterCreate(BaseModel):
     email: str
     name: Optional[str] = None
@@ -73,7 +67,6 @@ class NewsletterSubscriber(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class ReviewCreate(BaseModel):
-    """Used by the old general /api/reviews POST — kept for backwards compat."""
     name: str
     rating: int = Field(ge=1, le=5)
     text: str
@@ -82,28 +75,25 @@ class ReviewCreate(BaseModel):
     product: Optional[str] = None
 
 class Review(BaseModel):
-    """Stored review document — supports both legacy seed reviews and new product reviews."""
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    # product_id is optional so seed/legacy reviews without it still load fine
     product_id: Optional[str] = None
     name: str
-    email: Optional[str] = None          # new field, optional for legacy reviews
+    email: Optional[str] = None
     rating: int
     text: str
-    location: Optional[str] = None       # legacy field kept
-    photo_url: Optional[str] = None      # URL or base64
-    product: Optional[str] = None        # legacy product-name string kept
+    location: Optional[str] = None
+    photo_url: Optional[str] = None
+    product: Optional[str] = None
     verified: bool = False
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class ProductReviewCreate(BaseModel):
-    """Payload for POST /api/products/{product_id}/reviews"""
     name: str
     email: str
     rating: int = Field(ge=1, le=5)
     text: str
-    photo_url: Optional[str] = None      # URL or base64
+    photo_url: Optional[str] = None
 
 class OrderCreate(BaseModel):
     items: list
@@ -173,10 +163,21 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = None
     address: Optional[dict] = None
 
+class Product(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    brand: str
+    price: float
+    category: str
+    description: str = ""
+    sizes: list[str] = []
+    image: str = ""
+    stock: int = 100
+    featured: bool = False
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    model_config = ConfigDict(extra="ignore")
 
-# ─────────────────────────────────────────
-# AUTH CONFIG
-# ─────────────────────────────────────────
+
 SECRET_KEY = os.environ.get("SECRET_KEY", "elara-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
@@ -187,7 +188,7 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password[:72])
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return pwd_context.verify(plain[:72], hashed)
 
 def create_token(data: dict) -> str:
     expire = datetime.now(timezone.utc) + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
@@ -207,9 +208,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         return None
 
 
-# ─────────────────────────────────────────
-# SEED DATA
-# ─────────────────────────────────────────
 SEED_REVIEWS = [
     {"name": "Aurelie Marchand", "location": "Paris, France", "rating": 5,
      "text": "ELARA's curation is unmatched. My Aquazzura mules arrived in petal-soft packaging — pure poetry.",
@@ -238,9 +236,6 @@ SEED_REVIEWS = [
 ]
 
 
-# ─────────────────────────────────────────
-# LIFESPAN
-# ─────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     count = await db.reviews.count_documents({})
@@ -252,16 +247,20 @@ async def lifespan(app: FastAPI):
     client.close()
 
 
-# ─────────────────────────────────────────
-# APP
-# ─────────────────────────────────────────
 app = FastAPI(title="ELARA API", lifespan=lifespan)
 api_router = APIRouter(prefix="/api")
 
+# ── CORS FIRST ──
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# ─────────────────────────────────────────
-# ROUTES
-# ─────────────────────────────────────────
+
+# ── Root ──
 @api_router.get("/")
 async def root():
     return {"brand": "ELARA", "tagline": "Where flowers bloom underfoot"}
@@ -273,6 +272,8 @@ async def health():
         return {"status": "ok", "mongo": "connected"}
     except Exception as e:
         return {"status": "error", "mongo": str(e)}
+
+
 # ── Auth ──
 @api_router.post("/auth/register")
 async def register(payload: UserRegister):
@@ -299,6 +300,7 @@ async def register(payload: UserRegister):
     except Exception as e:
         logger.error(f"Register error: {type(e).__name__}: {e}")
         raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)}")
+
 @api_router.post("/auth/login")
 async def login(payload: UserLogin):
     email = payload.email.strip().lower()
@@ -352,7 +354,7 @@ async def subscribe_newsletter(payload: NewsletterCreate):
       <p style="color: #6a823e; line-height: 1.8;">You've joined a quiet circle of those who believe a shoe is not merely worn — it is remembered.</p>
       <p style="color: #364023; line-height: 1.8;">Expect editorial reflections, private previews, and the occasional poem. Curated thrice a season.</p>
       <hr style="border: none; border-top: 1px solid #e6b1c4; margin: 30px 0;">
-      <a href="http://localhost:3000/collections?cat=all"
+      <a href="https://elara-site-rho.vercel.app/collections?cat=all"
         style="background: #364023; color: #faf6f0; padding: 14px 32px; border-radius: 999px;
                text-decoration: none; font-size: 11px; letter-spacing: 3px; text-transform: uppercase;">
         Enter the Atelier
@@ -369,44 +371,25 @@ async def newsletter_count():
     return {"count": n}
 
 
-# ═══════════════════════════════════════════════════════════
-# PRODUCTS CRUD
-# ═══════════════════════════════════════════════════════════
-
-class Product(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
-    brand: str
-    price: float
-    category: str
-    description: str = ""
-    sizes: list[str] = []
-    image: str = ""  # URL or base64
-    stock: int = 100
-    featured: bool = False
-    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
-
-    model_config = ConfigDict(extra="ignore")
-
-@app.get("/products")
-
+# ── Products ──
+@api_router.get("/products")
 async def get_products():
     products = await db.products.find({}, {"_id": 0}).to_list(1000)
     return products
 
-@app.get("/products/{product_id}")
+@api_router.get("/products/{product_id}")
 async def get_product(product_id: str):
     product = await db.products.find_one({"id": product_id}, {"_id": 0})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
-@app.post("/products")
+@api_router.post("/products")
 async def create_product(product: Product):
     await db.products.insert_one(product.model_dump())
     return product
 
-@app.put("/products/{product_id}")
+@api_router.put("/products/{product_id}")
 async def update_product(product_id: str, product: Product):
     result = await db.products.update_one(
         {"id": product_id},
@@ -416,7 +399,7 @@ async def update_product(product_id: str, product: Product):
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
-@app.delete("/products/{product_id}")
+@api_router.delete("/products/{product_id}")
 async def delete_product(product_id: str):
     result = await db.products.delete_one({"id": product_id})
     if result.deleted_count == 0:
@@ -424,21 +407,14 @@ async def delete_product(product_id: str):
     return {"message": "Product deleted", "id": product_id}
 
 
-# ═══════════════════════════════════════════════════════════
-# PRODUCT-SPECIFIC REVIEWS
-# ═══════════════════════════════════════════════════════════
-
-@app.get("/products/{product_id}/reviews")
+# ── Product Reviews ──
+@api_router.get("/products/{product_id}/reviews")
 async def get_product_reviews(product_id: str):
-    """Get all reviews for a specific product, with rating summary."""
     reviews = await db.reviews.find(
-        {"product_id": product_id},
-        {"_id": 0}
+        {"product_id": product_id}, {"_id": 0}
     ).sort("created_at", -1).to_list(1000)
-
     if not reviews:
         return {"reviews": [], "summary": None}
-
     ratings = [r.get("rating", 0) for r in reviews]
     avg = sum(ratings) / len(ratings)
     summary = {
@@ -448,14 +424,11 @@ async def get_product_reviews(product_id: str):
     }
     return {"reviews": reviews, "summary": summary}
 
-@app.post("/products/{product_id}/reviews")
+@api_router.post("/products/{product_id}/reviews")
 async def create_product_review(product_id: str, payload: ProductReviewCreate):
-    """Submit a review for a specific product."""
-    # Check product exists
     product = await db.products.find_one({"id": product_id}, {"_id": 0, "name": 1})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-
     review = Review(
         product_id=product_id,
         name=payload.name,
@@ -463,15 +436,13 @@ async def create_product_review(product_id: str, payload: ProductReviewCreate):
         rating=payload.rating,
         text=payload.text,
         photo_url=payload.photo_url or "",
-        product=product.get("name"),   # store product name for display convenience
+        product=product.get("name"),
     )
     await db.reviews.insert_one(review.model_dump())
-    # Return without _id
-    result = review.model_dump()
-    return {"message": "Review submitted", "review": result}
+    return {"message": "Review submitted", "review": review.model_dump()}
 
 
-# ── General Reviews (legacy endpoints kept) ──
+# ── General Reviews ──
 @api_router.get("/reviews", response_model=List[Review])
 async def list_reviews():
     items = await db.reviews.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
@@ -499,7 +470,7 @@ async def reviews_summary():
     return {"total": total, "average": round(sum_r / total, 2), "breakdown": breakdown}
 
 
-# ── Orders — specific routes FIRST ──
+# ── Orders ──
 @api_router.post("/orders")
 async def create_order(payload: OrderCreate):
     count = await db.orders.count_documents({})
@@ -526,10 +497,10 @@ async def create_order(payload: OrderCreate):
       </p>
       <div style="background: #f0ece4; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
         <p style="color: #c9a96e; font-size: 10px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 12px;">Order Summary</p>
-        {"".join([f'<div style="padding: 8px 0; border-bottom: 1px solid #e6b1c430;"><span style="color:#364023">{item.get("name","")} × {item.get("quantity",1)} — € {item.get("price",0) * item.get("quantity",1):,.0f}</span></div>' for item in payload.items])}
+        {"".join([f'<div style="padding: 8px 0; border-bottom: 1px solid #e6b1c430;"><span style="color:#364023">{item.get("name","")} x {item.get("quantity",1)} - E {item.get("price",0) * item.get("quantity",1):,.0f}</span></div>' for item in payload.items])}
         <div style="padding: 12px 0 0 0;">
           <span style="color:#364023; font-size: 10px; letter-spacing: 2px; text-transform: uppercase;">Total: </span>
-          <span style="color:#364023; font-size: 20px; font-style: italic;">€ {payload.total:,.0f}</span>
+          <span style="color:#364023; font-size: 20px; font-style: italic;">E {payload.total:,.0f}</span>
         </div>
       </div>
       <div style="background: #f0ece4; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
@@ -540,7 +511,7 @@ async def create_order(payload: OrderCreate):
           {payload.shipping.get('zip','')}, {payload.shipping.get('country','')}
         </p>
       </div>
-      <a href="http://localhost:3000/track"
+      <a href="https://elara-site-rho.vercel.app/track"
         style="background: #364023; color: #faf6f0; padding: 14px 32px; border-radius: 999px;
                text-decoration: none; font-size: 11px; letter-spacing: 3px; text-transform: uppercase; display: inline-block;">
         Track Your Order
@@ -602,7 +573,7 @@ async def update_order_status(order_id: str, payload: dict):
     return {"message": "Updated"}
 
 
-# ── Coupons — specific routes FIRST ──
+# ── Coupons ──
 @api_router.post("/coupons")
 async def create_coupon(payload: CouponCreate):
     existing = await db.coupons.find_one({"code": payload.code.upper()})
@@ -631,7 +602,7 @@ async def validate_coupon(payload: dict):
     if coupon.get("uses", 0) >= coupon.get("max_uses", 100):
         raise HTTPException(status_code=400, detail="Coupon has reached its usage limit")
     if order_total < coupon.get("min_order", 0):
-        raise HTTPException(status_code=400, detail=f"Minimum order €{coupon['min_order']} required")
+        raise HTTPException(status_code=400, detail=f"Minimum order E{coupon['min_order']} required")
     if coupon["discount_type"] == "percent":
         discount = round(order_total * coupon["discount_value"] / 100, 2)
     else:
@@ -641,7 +612,7 @@ async def validate_coupon(payload: dict):
         "discount_type": coupon["discount_type"],
         "discount_value": coupon["discount_value"],
         "discount_amount": discount,
-        "message": f"{'{}%'.format(int(coupon['discount_value'])) if coupon['discount_type'] == 'percent' else '€{}'.format(coupon['discount_value'])} off applied!"
+        "message": f"{'{}%'.format(int(coupon['discount_value'])) if coupon['discount_type'] == 'percent' else 'E{}'.format(coupon['discount_value'])} off applied!"
     }
 
 @api_router.post("/coupons/use")
@@ -662,8 +633,8 @@ async def list_users():
     users = await db.users.find({}, {"_id": 0, "hashed_password": 0}).sort("created_at", -1).to_list(500)
     return users
 
-# Admin authentication endpoint (registered on app directly, not api_router)
-@app.post("/api/admin/verify")
+# ── Admin ──
+@api_router.post("/admin/verify")
 async def verify_admin(credentials: dict):
     admin_password = os.environ.get("ADMIN_PASSWORD", "elara2024")
     if credentials.get("password") == admin_password:
@@ -672,18 +643,5 @@ async def verify_admin(credentials: dict):
         raise HTTPException(status_code=401, detail="Invalid admin password")
 
 
-# ─────────────────────────────────────────
-# REGISTER + MIDDLEWARE
-# ─────────────────────────────────────────
-# ─────────────────────────────────────────
-# REGISTER + MIDDLEWARE
-# ─────────────────────────────────────────
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# ── Register router ──
 app.include_router(api_router)
-# force redeploy
