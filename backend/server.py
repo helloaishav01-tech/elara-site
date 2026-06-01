@@ -1,5 +1,4 @@
-import resend
-import requests  # ← ADD THIS LINE
+import requests
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter, HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
@@ -37,8 +36,9 @@ razorpay_client = razorpay.Client(
 def send_email(to_email: str, subject: str, html_body: str):
     try:
         api_key = os.environ.get("RESEND_API_KEY")
+        logger.info(f"[EMAIL] Key present: {bool(api_key)}, sending to: {to_email}")
         if not api_key:
-            logger.warning("RESEND_API_KEY not set — skipping email")
+            logger.warning("[EMAIL] RESEND_API_KEY not set — skipping")
             return
         response = requests.post(
             "https://api.resend.com/emails",
@@ -51,14 +51,13 @@ def send_email(to_email: str, subject: str, html_body: str):
                 "to": [to_email],
                 "subject": subject,
                 "html": html_body
-            }
+            },
+            timeout=10
         )
-        if response.status_code == 200:
-            logger.info(f"Email sent to {to_email}")
-        else:
-            logger.error(f"Email failed: {response.status_code} {response.text}")
+        logger.info(f"[EMAIL] Status: {response.status_code} | Body: {response.text}")
     except Exception as e:
-        logger.error(f"Email failed: {e}")
+        logger.error(f"[EMAIL] Exception: {type(e).__name__}: {e}")
+
 
 class NewsletterCreate(BaseModel):
     email: str
@@ -619,14 +618,6 @@ async def verify_admin(credentials: dict):
         return {"success": True, "message": "Admin authenticated"}
     else:
         raise HTTPException(status_code=401, detail="Invalid admin password")
-
-
-@api_router.get("/test-email")
-async def test_email():
-    api_key = os.environ.get("RESEND_API_KEY")
-    if not api_key:
-        return {"error": "RESEND_API_KEY not set!"}
-    return {"key_found": True, "key_preview": api_key[:8] + "..."}
 
 
 app.include_router(api_router)
